@@ -1,0 +1,75 @@
+from google.colab import files
+uploaded = files.upload()
+
+# Install the required library
+!pip install simpletransformers
+
+import pandas as pd
+from simpletransformers.ner import NERModel, NERArgs
+
+# Load the NER dataset
+data = pd.read_csv("ner_dataset.csv", encoding="latin1")
+
+# Display the first 30 rows of the dataset
+print(data.head(30))
+
+# Define NER labels
+labels = ["B-LOC", "I-LOC", "B-ORG", "I-ORG", "B-PER", "I-PER", "B-MISC", "I-MISC", "O"]
+
+# Define the NER model arguments
+ner_args = NERArgs()
+ner_args.labels_list = labels
+ner_args.overwrite_output_dir = True
+
+# Initialize the NER model
+ner_model = NERModel(
+    "bert",       # You can use other pre-trained models as well, like "roberta", "xlnet", etc.
+    "bert-base-cased",
+    labels=labels,
+    args=ner_args,
+    use_cuda=False 
+)
+
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
+# Encode sentence IDs
+data["Sentence #"] = LabelEncoder().fit_transform(data["Sentence #"])
+
+# Rename columns
+data.rename(columns={"Sentence #": "sentence_id", "Word": "words", "Tag": "labels"}, inplace=True)
+
+# Convert labels to uppercase
+data["labels"] = data["labels"].str.upper()
+
+# Prepare features and labels
+X = data[["sentence_id", "words"]]
+Y = data["labels"]
+
+# Split data into training and testing sets
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
+
+# Create train_data and test_data DataFrames
+train_data = pd.DataFrame({"sentence_id": x_train["sentence_id"], "words": x_train["words"], "labels": y_train})
+test_data = pd.DataFrame({"sentence_id": x_test["sentence_id"], "words": x_test["words"], "labels": y_test})
+
+# Display the train_data DataFrame
+train_data.head()
+
+# Prepare data for NER training
+train_examples = []
+for sentence_id, group in train_data.groupby("sentence_id"):
+    words = group["words"].tolist()
+    labels = group["labels"].tolist()
+    entities = []
+    for word, label in zip(words, labels):
+        entities.append((word, label))
+    train_examples.append({"text": " ".join(words), "entities": entities})
+
+
+# Train the NER model
+ner_model.train_model(train_examples)
+
+# Save the trained NER model
+ner_model.save_model("ner_model")
