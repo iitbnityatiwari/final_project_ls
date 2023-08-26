@@ -72,4 +72,30 @@ for sentence_id, group in train_data.groupby("sentence_id"):
 ner_model.train_model(train_examples)
 
 # Save the trained NER model
-ner_model.save_model("ner_model")
+ner_model.save_model("D:/ner_model")
+
+!pip install gradio
+
+import gradio as gr
+# Load the trained NER model
+from simpletransformers.ner import NERModel
+ner_model = NERModel("bert", "ner_model")
+
+# Define a function to make predictions using the NER model
+def ner_predict(text):
+    predictions, _ = ner_model.predict([text])
+    return predictions[0]
+
+# Create a Gradio interface
+iface = gr.Interface(
+    fn=ner_predict,
+    inputs=gr.inputs.Textbox(),
+    outputs=gr.outputs.Textbox(label="NER Tags"),
+    live=True,
+    layout="vertical",
+    title="NER Model Demo",
+    description="Enter a sentence to see NER predictions."
+)
+
+# Launch the interface
+iface.launch()
